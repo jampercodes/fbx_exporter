@@ -1,4 +1,7 @@
+#pragma once
+
 #include <stdio.h>
+#include <string>
 
 struct fbx_property {
     char type[4];
@@ -7,10 +10,10 @@ struct fbx_property {
 
 class fbx_node {
 public:
-    fbx_node(char *name);
+    fbx_node(std::string name);
     
 private:
-    char* node_name;
+    std::string node_name;
 
     unsigned int property_count;
     fbx_property* properties;
@@ -21,7 +24,7 @@ private:
 
 class fbx_manager {
 public:
-    fbx_manager(char *filename, char *filelocation);
+    fbx_manager(std::string filename, std::string filelocation);
     ~fbx_manager();
     
     void add_mesh();
@@ -34,4 +37,4 @@ private:
 const unsigned int FBX_VERSION = 6000;
 
 
-fbx_node root_node;
+extern fbx_node root_node;
