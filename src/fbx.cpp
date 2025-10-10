@@ -6,13 +6,17 @@ fbx_manager::fbx_manager(std::string filename, std::string filelocation) {
     // writing header to file
     M_file = fopen( "./test.fbx", "w");
 
-    //printf("Creating FBX file: %s%s.fbx\n", filelocation, filename);
 
     fprintf(M_file, "Kaydara FBX Binary  ");
-    //fprintf(M_file, "\x00\x1A\x00");
+
+    unsigned char magickBytes[] = {0x00, 0x1A, 0x00};
+    fwrite(magickBytes, sizeof(unsigned char), sizeof(magickBytes), M_file);
+
+
     fprintf(M_file, "%u", FBX_VERSION);
 
-    fbx_node root_node("RootNode");
+    // create root node
+    fbx_node root_node;
 
 }
 
@@ -30,8 +34,17 @@ void fbx_manager::add_mesh() {
 }
 
 fbx_node::fbx_node(std::string name) {
-    node_name = name;
     
+}
+
+fbx_node::fbx_node() {
+    name_len = 0;
+    node_name = nullptr;
+
+    num_properties = 0;
+    property_list_len = 0;
+
+    property_count = 0;
     chiled_node_count = 0;
-    chiled_nodes = nullptr;
+    
 }

@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string>
+#include <inttypes.h>
 
 struct fbx_property {
     char type[4];
@@ -11,14 +12,22 @@ struct fbx_property {
 class fbx_node {
 public:
     fbx_node(std::string name);
+    // root node constructor
+    fbx_node();
     
 private:
-    std::string node_name;
+    uint32_t end_offset;
+    uint32_t num_properties;
+    uint32_t property_list_len;
 
-    unsigned int property_count;
+    uint8_t name_len;
+
+    char* node_name;
+
+    int property_count;
     fbx_property* properties;
 
-    unsigned int chiled_node_count;
+    int chiled_node_count;
     fbx_node* chiled_nodes;
 };
 
