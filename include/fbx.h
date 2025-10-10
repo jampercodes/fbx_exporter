@@ -11,10 +11,7 @@ struct fbx_property {
 
 class fbx_node {
 public:
-    fbx_node(std::string name);
-    // root node constructor
     fbx_node();
-    
 private:
     uint32_t end_offset;
     uint32_t num_properties;
@@ -47,3 +44,6 @@ const unsigned int FBX_VERSION = 6000;
 
 
 extern fbx_node root_node;
+
+fbx_node CreateNode(std::string Name);
+void AddChildNode(fbx_node ParentNode, fbx_node Node);

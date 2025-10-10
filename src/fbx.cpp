@@ -1,5 +1,11 @@
 #include "fbx.h"
 
+// methods
+fbx_node CreateNode(std::string Name) {
+    fbx_node node;
+
+}
+
 //class methods
 fbx_manager::fbx_manager(std::string filename, std::string filelocation) {
     
@@ -11,7 +17,6 @@ fbx_manager::fbx_manager(std::string filename, std::string filelocation) {
 
     unsigned char magickBytes[] = {0x00, 0x1A, 0x00};
     fwrite(magickBytes, sizeof(unsigned char), sizeof(magickBytes), M_file);
-
 
     fprintf(M_file, "%u", FBX_VERSION);
 
@@ -31,10 +36,6 @@ void fbx_manager::add_mesh() {
     
 
     // add mesh data to the file
-}
-
-fbx_node::fbx_node(std::string name) {
-    
 }
 
 fbx_node::fbx_node() {
