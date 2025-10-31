@@ -1,49 +1,70 @@
 #pragma once
 
-#include <stdio.h>
+#include <cstdio>
 #include <string>
-#include <inttypes.h>
+#include <vector>
+#include <cstdint>
 
-struct fbx_property {
-    char type[4];
-    void* data;
+const unsigned int FBX_VERSION = 6000;
+
+// A simple property variant used by this minimal exporter.
+struct FbxProperty {
+    // type char as used by FBX binary (e.g. 'S' for string, 'I' for int, 'D' for double, lowercase for arrays in full spec)
+    char type;
+    std::vector<uint8_t> data; // raw bytes of the property payload
 };
 
-class fbx_node {
+class FbxNode {
 public:
-    fbx_node();
+    explicit FbxNode(const std::string& name = "");
+
+    void addProperty(const FbxProperty& prop);
+    void addChild(const FbxNode& child);
+
+    // write node to stream (binary FBX node format version 6000)
+    void write(FILE* f) const;
+
 private:
-    uint32_t end_offset;
-    uint32_t num_properties;
-    uint32_t property_list_len;
-
-    uint8_t name_len;
-
-    char* node_name;
-
-    int property_count;
-    fbx_property* properties;
-
-    int chiled_node_count;
-    fbx_node* chiled_nodes;
+    std::string name;
+    std::vector<FbxProperty> properties;
+    std::vector<FbxNode> children;
+public:
+    // const accessors used by serialization helpers
+    const std::string& getName() const { return name; }
+    const std::vector<FbxProperty>& getProperties() const { return properties; }
+    const std::vector<FbxNode>& getChildren() const { return children; }
 };
 
 class fbx_manager {
 public:
-    fbx_manager(std::string filename, std::string filelocation);
+    fbx_manager(const std::string& filename, const std::string& filelocation);
     ~fbx_manager();
-    
-    void add_mesh();
+
+    // convenience helpers
+    void addEmpty(const std::string& name);
+    void addMaterial(const std::string& name);
+    // vertices: flat array of doubles [x0,y0,z0, x1,y1,z1, ...]
+    // normals: optional flat array of doubles [nx0,ny0,nz0, ...]
+    // uvs: optional flat array of doubles [u0,v0, u1,v1, ...]
+    void addMesh(const std::string& name,
+                 const std::vector<double>& vertices,
+                 const std::vector<uint32_t>& indices,
+                 const std::vector<double>& normals = {},
+                 const std::vector<double>& uvs = {});
+
+    // finalize & write file (called automatically in destructor)
+    void writeFile();
 
 private:
     FILE* M_file;
+    std::string filename;
+    std::string filelocation;
+
+    FbxNode root;
+    FbxNode objectsNode;
+    FbxNode connectionsNode;
+    int64_t nextId = 1000; // simple id generator
+    bool enableCompression = true;
+
+    int64_t allocId() { return nextId++; }
 };
-
-
-const unsigned int FBX_VERSION = 6000;
-
-
-extern fbx_node root_node;
-
-fbx_node CreateNode(std::string Name);
-void AddChildNode(fbx_node ParentNode, fbx_node Node);
