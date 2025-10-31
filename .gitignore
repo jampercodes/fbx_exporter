@@ -5,3 +5,5 @@
 build/
 
 *.out
+*.fbx
+*.exe
