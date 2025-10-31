@@ -33,6 +33,19 @@ static void serializeProperties(const std::vector<FbxProperty>& props, std::vect
     }
 }
 
+// small helpers to create typed properties
+static FbxProperty makeStringProp(const std::string& s) {
+    FbxProperty p; p.type = 'S'; uint32_t len = (uint32_t)s.size(); p.data.resize(4 + len); memcpy(p.data.data(), &len, 4); memcpy(p.data.data() + 4, s.data(), len); return p;
+}
+
+static FbxProperty makeIntProp(int32_t v) {
+    FbxProperty p; p.type = 'I'; p.data.resize(4); memcpy(p.data.data(), &v, 4); return p;
+}
+
+static FbxProperty makeLongProp(int64_t v) {
+    FbxProperty p; p.type = 'L'; p.data.resize(8); memcpy(p.data.data(), &v, 8); return p;
+}
+
 // helper: build FBX array property payload (count, encoding, compressedLen, rawBytes or compressed)
 static std::vector<uint8_t> buildArrayProperty(const void* rawData, size_t rawBytes, uint32_t elemCount, bool compress) {
     std::vector<uint8_t> out;
@@ -195,7 +208,7 @@ void fbx_manager::addEmpty(const std::string& name) {
     // connection: Model -> (no parent) will be added later if needed
 }
 
-void fbx_manager::addMaterial(const std::string& name) {
+int64_t fbx_manager::addMaterial(const std::string& name) {
     int64_t id = allocId();
     FbxNode mnode("Material::" + name);
     FbxProperty idp;
@@ -213,9 +226,10 @@ void fbx_manager::addMaterial(const std::string& name) {
     mnode.addProperty(p);
 
     objectsNode.addChild(mnode);
+    return id;
 }
 
-void fbx_manager::addMesh(const std::string& name, const std::vector<double>& vertices, const std::vector<uint32_t>& indices, const std::vector<double>& normals, const std::vector<double>& uvs) {
+void fbx_manager::addMesh(const std::string& name, const std::vector<double>& vertices, const std::vector<uint32_t>& indices, const std::vector<double>& normals, const std::vector<double>& uvs, const FbxTransform& xform, int64_t materialId) {
     int64_t geomId = allocId();
     int64_t modelId = allocId();
 
@@ -249,8 +263,9 @@ void fbx_manager::addMesh(const std::string& name, const std::vector<double>& ve
     }
 
     // polygonVertexIndex: convert triangle list to FBX polygon indices (negate last index with ~)
+    std::vector<int32_t> polyIdx;
     if (!indices.empty()) {
-        std::vector<int32_t> polyIdx; polyIdx.reserve(indices.size());
+        polyIdx.reserve(indices.size());
         // assume triangles; every 3 indices is a polygon
         for (size_t i = 0; i < indices.size(); i += 3) {
             uint32_t a = indices[i];
@@ -269,26 +284,51 @@ void fbx_manager::addMesh(const std::string& name, const std::vector<double>& ve
         gnode.addProperty(idxs);
     }
 
-    // normals
-    if (!normals.empty()) {
-        uint32_t count = (uint32_t)normals.size();
+    // For LayerElement mapping ByPolygonVertex, create arrays that follow polygon-vertex order
+    size_t polyVertCount = polyIdx.size();
+    // normals: remap per polygon-vertex if normals provided per control point
+    if (!normals.empty() && polyVertCount > 0) {
+        std::vector<double> normalsByPV; normalsByPV.resize(polyVertCount * 3);
+        for (size_t k = 0; k < polyVertCount; ++k) {
+            int32_t v = polyIdx[k];
+            int32_t cp = (v < 0) ? ~v : v;
+            // bounds check
+            size_t base = (size_t)cp * 3;
+            if (base + 2 < normals.size()) {
+                normalsByPV[k*3 + 0] = normals[base + 0];
+                normalsByPV[k*3 + 1] = normals[base + 1];
+                normalsByPV[k*3 + 2] = normals[base + 2];
+            } else {
+                normalsByPV[k*3 + 0] = 0.0;
+                normalsByPV[k*3 + 1] = 0.0;
+                normalsByPV[k*3 + 2] = 1.0;
+            }
+        }
+        uint32_t count = (uint32_t)normalsByPV.size();
         bool tryCompress = enableCompression && (count * sizeof(double) > 256);
-        auto arr = buildArrayProperty(normals.data(), count * sizeof(double), count, tryCompress);
-        FbxProperty nprop;
-        nprop.type = 'd';
-        nprop.data = std::move(arr);
-        gnode.addProperty(nprop);
+        auto arr = buildArrayProperty(normalsByPV.data(), count * sizeof(double), count, tryCompress);
+        FbxProperty nprop; nprop.type = 'd'; nprop.data = std::move(arr); gnode.addProperty(nprop);
     }
 
-    // uvs (u,v pairs)
-    if (!uvs.empty()) {
-        uint32_t count = (uint32_t)uvs.size();
+    // uvs: remap per polygon-vertex (u,v pairs)
+    if (!uvs.empty() && polyVertCount > 0) {
+        std::vector<double> uvsByPV; uvsByPV.resize(polyVertCount * 2);
+        for (size_t k = 0; k < polyVertCount; ++k) {
+            int32_t v = polyIdx[k];
+            int32_t cp = (v < 0) ? ~v : v;
+            size_t base = (size_t)cp * 2;
+            if (base + 1 < uvs.size()) {
+                uvsByPV[k*2 + 0] = uvs[base + 0];
+                uvsByPV[k*2 + 1] = uvs[base + 1];
+            } else {
+                uvsByPV[k*2 + 0] = 0.0;
+                uvsByPV[k*2 + 1] = 0.0;
+            }
+        }
+        uint32_t count = (uint32_t)uvsByPV.size();
         bool tryCompress = enableCompression && (count * sizeof(double) > 256);
-        auto arr = buildArrayProperty(uvs.data(), count * sizeof(double), count, tryCompress);
-        FbxProperty uvprop;
-        uvprop.type = 'd';
-        uvprop.data = std::move(arr);
-        gnode.addProperty(uvprop);
+        auto arr = buildArrayProperty(uvsByPV.data(), count * sizeof(double), count, tryCompress);
+        FbxProperty uvprop; uvprop.type = 'd'; uvprop.data = std::move(arr); gnode.addProperty(uvprop);
     }
 
     objectsNode.addChild(gnode);
@@ -299,22 +339,105 @@ void fbx_manager::addMesh(const std::string& name, const std::vector<double>& ve
     midp.type = 'L'; midp.data.resize(8); memcpy(midp.data.data(), &modelId, 8); mnode.addProperty(midp);
     FbxProperty mnamep; mnamep.type = 'S'; uint32_t mlen = (uint32_t)name.size(); mnamep.data.resize(4+mlen); memcpy(mnamep.data.data(), &mlen,4); memcpy(mnamep.data.data()+4, name.data(), mlen); mnode.addProperty(mnamep);
 
+    // add transform info in a Properties70 child using P entries (Lcl Translation/Rotation/Scaling)
+    FbxNode props70("Properties70");
+    char buf[256];
+    // Translation
+    snprintf(buf, sizeof(buf), "P|Lcl Translation|Lcl Translation|Lcl Translation|Vector3D|%g|%g|%g", xform.t[0], xform.t[1], xform.t[2]);
+    props70.addProperty(makeStringProp(std::string(buf)));
+    // Rotation
+    snprintf(buf, sizeof(buf), "P|Lcl Rotation|Lcl Rotation|Lcl Rotation|Vector3D|%g|%g|%g", xform.r[0], xform.r[1], xform.r[2]);
+    props70.addProperty(makeStringProp(std::string(buf)));
+    // Scaling
+    snprintf(buf, sizeof(buf), "P|Lcl Scaling|Lcl Scaling|Lcl Scaling|Vector3D|%g|%g|%g", xform.s[0], xform.s[1], xform.s[2]);
+    props70.addProperty(makeStringProp(std::string(buf)));
+    mnode.addChild(props70);
+
     objectsNode.addChild(mnode);
 
-    // connection entries: store for writing later
-    // Connection: Model -> Geometry
+    // connection entries: Model -> Geometry
     FbxNode c1("C");
     FbxProperty ct; ct.type = 'S'; std::string typ = "OO"; ct.data.resize(4 + typ.size()); uint32_t tlen = (uint32_t)typ.size(); memcpy(ct.data.data(), &tlen, 4); memcpy(ct.data.data()+4, typ.data(), typ.size()); c1.addProperty(ct);
     FbxProperty fromp; fromp.type = 'L'; fromp.data.resize(8); memcpy(fromp.data.data(), &modelId, 8); c1.addProperty(fromp);
     FbxProperty top; top.type = 'L'; top.data.resize(8); memcpy(top.data.data(), &geomId, 8); c1.addProperty(top);
     connectionsNode.addChild(c1);
 
-}
+    // If material provided, add Connection: Model <- Material (Material -> Model)
+    if (materialId != -1) {
+        FbxNode cmat("C");
+        FbxProperty ctt; ctt.type = 'S'; std::string ttyp = "OO"; ctt.data.resize(4 + ttyp.size()); uint32_t ttlen = (uint32_t)ttyp.size(); memcpy(ctt.data.data(), &ttlen, 4); memcpy(ctt.data.data()+4, ttyp.data(), ttyp.size()); cmat.addProperty(ctt);
+        FbxProperty fromm; fromm.type = 'L'; fromm.data.resize(8); memcpy(fromm.data.data(), &materialId, 8); cmat.addProperty(fromm);
+        FbxProperty tom; tom.type = 'L'; tom.data.resize(8); memcpy(tom.data.data(), &modelId, 8); cmat.addProperty(tom);
+        connectionsNode.addChild(cmat);
+    }
 
+    // Add LayerElement nodes for normals and UVs (mapping: ByVertice, reference: Direct)
+    if (!normals.empty()) {
+        FbxNode len("LayerElementNormal");
+        // mapping
+        FbxProperty map; map.type = 'S'; std::string mapv = "ByVertice"; map.data.resize(4 + mapv.size()); uint32_t mpsz = (uint32_t)mapv.size(); memcpy(map.data.data(), &mpsz, 4); memcpy(map.data.data()+4, mapv.data(), mapv.size()); len.addProperty(map);
+        // reference
+        FbxProperty ref; ref.type = 'S'; std::string refv = "Direct"; ref.data.resize(4 + refv.size()); uint32_t rpsz = (uint32_t)refv.size(); memcpy(ref.data.data(), &rpsz, 4); memcpy(ref.data.data()+4, refv.data(), refv.size()); len.addProperty(ref);
+        // direct array
+        FbxProperty nd; nd.type = 'd'; auto narr = buildArrayProperty(normals.data(), normals.size()*sizeof(double), (uint32_t)normals.size(), enableCompression); nd.data = std::move(narr); len.addProperty(nd);
+        gnode.addChild(len);
+    }
+
+    if (!uvs.empty()) {
+        FbxNode leuv("LayerElementUV");
+        FbxProperty map; map.type = 'S'; std::string mapv = "ByVertice"; map.data.resize(4 + mapv.size()); uint32_t mpsz = (uint32_t)mapv.size(); memcpy(map.data.data(), &mpsz, 4); memcpy(map.data.data()+4, mapv.data(), mapv.size()); leuv.addProperty(map);
+        FbxProperty ref; ref.type = 'S'; std::string refv = "Direct"; ref.data.resize(4 + refv.size()); uint32_t rpsz = (uint32_t)refv.size(); memcpy(ref.data.data(), &rpsz, 4); memcpy(ref.data.data()+4, refv.data(), refv.size()); leuv.addProperty(ref);
+        FbxProperty uvd; uvd.type = 'd'; auto uarr = buildArrayProperty(uvs.data(), uvs.size()*sizeof(double), (uint32_t)uvs.size(), enableCompression); uvd.data = std::move(uarr); leuv.addProperty(uvd);
+        gnode.addChild(leuv);
+    }
+}
 void fbx_manager::writeFile() {
     if (!M_file) return;
 
-    // assemble root children: Objects then Connections
+    // Build minimal header/definitions before Objects to improve importer compatibility
+    // FBXHeaderExtension (minimal)
+    FbxNode headerExt("FBXHeaderExtension");
+    headerExt.addProperty(makeIntProp(1003)); // FBXHeaderVersion (example)
+    headerExt.addProperty(makeIntProp((int32_t)FBX_VERSION));
+
+    // Definitions: count object types present
+    FbxNode defs("Definitions");
+    // count how many ObjectType children we'll emit
+    int geometryCount = 0, modelCount = 0, materialCount = 0;
+    for (const auto& o : objectsNode.getChildren()) {
+        const std::string& nm = o.getName();
+        if (nm.rfind("Geometry::", 0) == 0) ++geometryCount;
+        else if (nm.rfind("Model::", 0) == 0) ++modelCount;
+        else if (nm.rfind("Material::", 0) == 0) ++materialCount;
+    }
+    int types = 0;
+    if (geometryCount) ++types;
+    if (modelCount) ++types;
+    if (materialCount) ++types;
+    defs.addProperty(makeIntProp(types));
+    // ObjectType children
+    if (geometryCount) {
+        FbxNode ot("ObjectType");
+        ot.addProperty(makeStringProp("Geometry"));
+        ot.addProperty(makeIntProp(geometryCount));
+        defs.addChild(ot);
+    }
+    if (modelCount) {
+        FbxNode ot("ObjectType");
+        ot.addProperty(makeStringProp("Model"));
+        ot.addProperty(makeIntProp(modelCount));
+        defs.addChild(ot);
+    }
+    if (materialCount) {
+        FbxNode ot("ObjectType");
+        ot.addProperty(makeStringProp("Material"));
+        ot.addProperty(makeIntProp(materialCount));
+        defs.addChild(ot);
+    }
+
+    // assemble root children in canonical order: HeaderExtension, Definitions, Objects, Connections
+    root.addChild(headerExt);
+    root.addChild(defs);
     root.addChild(objectsNode);
     root.addChild(connectionsNode);
 

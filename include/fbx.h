@@ -14,6 +14,13 @@ struct FbxProperty {
     std::vector<uint8_t> data; // raw bytes of the property payload
 };
 
+struct FbxTransform {
+    double t[3]; // translation x,y,z
+    double r[3]; // rotation x,y,z (degrees)
+    double s[3]; // scale x,y,z
+    FbxTransform() { t[0]=t[1]=t[2]=0.0; r[0]=r[1]=r[2]=0.0; s[0]=s[1]=s[2]=1.0; }
+};
+
 class FbxNode {
 public:
     explicit FbxNode(const std::string& name = "");
@@ -42,15 +49,19 @@ public:
 
     // convenience helpers
     void addEmpty(const std::string& name);
-    void addMaterial(const std::string& name);
+    // returns material object id
+    int64_t addMaterial(const std::string& name);
     // vertices: flat array of doubles [x0,y0,z0, x1,y1,z1, ...]
     // normals: optional flat array of doubles [nx0,ny0,nz0, ...]
     // uvs: optional flat array of doubles [u0,v0, u1,v1, ...]
+    // materialId: optional material to assign to this mesh (pass -1 for none)
     void addMesh(const std::string& name,
                  const std::vector<double>& vertices,
                  const std::vector<uint32_t>& indices,
                  const std::vector<double>& normals = {},
-                 const std::vector<double>& uvs = {});
+                 const std::vector<double>& uvs = {},
+                 const FbxTransform& xform = FbxTransform(),
+                 int64_t materialId = -1);
 
     // finalize & write file (called automatically in destructor)
     void writeFile();
