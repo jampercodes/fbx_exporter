@@ -3,23 +3,18 @@ cmake_minimum_required(VERSION 3.10)
 
 project(fbxExport)
 
-set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD 17)
 
-add_library(fbxExport STATIC src/fbx.cpp)
-
-target_include_directories(fbxExport PRIVATE ${CMAKE_SOURCE_DIR}/include)
-
-# zlib is used to optionally compress FBX array payloads
-find_package(ZLIB REQUIRED)
-if(ZLIB_FOUND)
-	target_link_libraries(fbxExport PRIVATE ZLIB::ZLIB)
+message(STATUS "Target pointer size: ${CMAKE_SIZEOF_VOID_P}")
+if(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    message(STATUS "Building for x86")
+    set(target_architecture "x86")
+else()
+    message(STATUS "Building for x64")
+    set(target_architecture "x64")
 endif()
 
+add_executable(fbx_test src/fbx_test.cpp)
 
-# test fbx exporter
-project(fbxTest)
-
-add_executable(fbxTest fbx_test.cpp)
-
-target_include_directories(fbxTest PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(fbxTest PRIVATE fbxExport)
+target_include_directories(fbx_test PRIVATE ${CMAKE_SOURCE_DIR}/include)
+target_link_libraries(fbx_test PRIVATE ${CMAKE_SOURCE_DIR}/lib/FbxSdk/${target_architecture}/debug/libfbxsdk.a)
