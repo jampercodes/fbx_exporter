@@ -34,9 +34,27 @@ int main(int argc, char** argv) {
     // test building a simpell scene 
     FbxNode* lRootNode = lScene->GetRootNode();
 
+
     FbxNode* lTestNode = FbxNode::Create(lScene, "TestNode");
 
+    FbxMesh* lTestMesh = FbxMesh::Create(lScene, "TestMesh");
+    lTestNode->SetNodeAttribute(lTestMesh);
+
     lRootNode->AddChild(lTestNode);
+
+    //divine mesh
+    FbxVector4 vertex0(500, 0, 500);
+    FbxVector4 vertex1(-500, 0, 500);
+    FbxVector4 vertex2(500, 0, -500);
+    FbxVector4 vertex3(-500, 0, -500);
+
+    lTestMesh->InitControlPoints(4);
+
+    lTestMesh->SetControlPointAt(vertex0, 0);
+    lTestMesh->SetControlPointAt(vertex1, 1);
+    lTestMesh->SetControlPointAt(vertex2, 2);
+    lTestMesh->SetControlPointAt(vertex3, 3);
+    
 
     // Export the scene to the file.
     lExporter->Export(lScene);
