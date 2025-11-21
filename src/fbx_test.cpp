@@ -31,7 +31,12 @@ int main(int argc, char** argv) {
     // Create a new scene so it can be populated by the imported file.
     FbxScene* lScene = FbxScene::Create(lSdkManager,"myScene");
 
-    // ... Import a scene, or build a new one ...
+    // test building a simpell scene 
+    FbxNode* lRootNode = lScene->GetRootNode();
+
+    FbxNode* lTestNode = FbxNode::Create(lScene, "TestNode");
+
+    lRootNode->AddChild(lTestNode);
 
     // Export the scene to the file.
     lExporter->Export(lScene);
