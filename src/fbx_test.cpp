@@ -15,14 +15,6 @@ int main(int argc, char** argv) {
     // Create a new scene so it can be populated by the imported file.
     FbxScene* lScene = FbxScene::Create(lSdkManager,"myScene");
 
-    
-
-    //create CP 
-
-
-    //creat PG
-
-
 
     FbxExporter* lExporter = FbxExporter::Create(lSdkManager, "");
 
@@ -35,8 +27,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    // Create a new scene so it can be populated by the imported file.
-    FbxScene* lScene = FbxScene::Create(lSdkManager,"myScene");
 
     // test building a simpell scene 
     FbxNode* lRootNode = lScene->GetRootNode();
