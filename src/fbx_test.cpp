@@ -1,10 +1,6 @@
 #include <fbxsdk.h>
 
 
-/**
- * Main function - loads the hard-coded fbx file,
- * and prints its contents in an xml format to stdout.
- */
 int main(int argc, char** argv) {
 
     // Change the following filename to a suitable filename value.
@@ -15,6 +11,17 @@ int main(int argc, char** argv) {
   
     FbxIOSettings* ios = FbxIOSettings::Create(lSdkManager, IOSROOT);
     lSdkManager->SetIOSettings(ios);
+
+    // Create a new scene so it can be populated by the imported file.
+    FbxScene* lScene = FbxScene::Create(lSdkManager,"myScene");
+
+    
+
+    //create CP 
+
+
+    //creat PG
+
 
 
     FbxExporter* lExporter = FbxExporter::Create(lSdkManager, "");

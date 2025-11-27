@@ -14,7 +14,13 @@ else()
     set(target_architecture "x64")
 endif()
 
+if(WIN32)
+    set(libExstention ".lib")
+else()
+    set(libExstention ".a")
+endif()
+
 add_executable(fbx_test src/fbx_test.cpp)
 
 target_include_directories(fbx_test PRIVATE ${CMAKE_SOURCE_DIR}/include)
-target_link_libraries(fbx_test PRIVATE ${CMAKE_SOURCE_DIR}/lib/FbxSdk/${target_architecture}/debug/libfbxsdk.a)
+target_link_libraries(fbx_test PRIVATE ${CMAKE_SOURCE_DIR}/lib/FbxSdk/${target_architecture}/debug/libfbxsdk${libExstention})
