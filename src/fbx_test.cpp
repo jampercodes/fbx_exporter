@@ -43,10 +43,10 @@ int main(int argc, char** argv) {
     lRootNode->AddChild(lTestNode);
 
     //divine mesh
-    FbxVector4 vertex0(500, 0, 500);
-    FbxVector4 vertex1(-500, 0, 500);
-    FbxVector4 vertex2(500, 0, -500);
-    FbxVector4 vertex3(-500, 0, -500);
+    FbxVector4 vertex0(500, 0, 500); // top left 0
+    FbxVector4 vertex1(-500, 0, 500); // top right 1
+    FbxVector4 vertex2(500, 0, -500); // bottom left 2
+    FbxVector4 vertex3(-500, 0, -500); // bottom right 3
 
     lTestMesh->InitControlPoints(4);
 
@@ -54,7 +54,18 @@ int main(int argc, char** argv) {
     lTestMesh->SetControlPointAt(vertex1, 1);
     lTestMesh->SetControlPointAt(vertex2, 2);
     lTestMesh->SetControlPointAt(vertex3, 3);
+
+    lTestMesh->BeginPolygon();
+    lTestMesh->AddPolygon(0);
+    lTestMesh->AddPolygon(1);
+    lTestMesh->AddPolygon(3);
+    lTestMesh->EndPolygon();
     
+    lTestMesh->BeginPolygon();
+    lTestMesh->AddPolygon(0);
+    lTestMesh->AddPolygon(2);
+    lTestMesh->AddPolygon(3);
+    lTestMesh->EndPolygon();
 
     // Export the scene to the file.
     lExporter->Export(lScene);
